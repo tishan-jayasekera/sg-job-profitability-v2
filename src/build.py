@@ -13,14 +13,17 @@ from src.quote_intelligence import build_job_template_library, build_task_catalo
 from src.revenue import build_revenue_monthly
 from src.timesheet import build_timesheet_task_month
 from src.quotation import build_quote_task
-from src.utils import ensure_dir, setup_logger, write_json
+from src.utils import ensure_dir, fiscal_year_label, setup_logger, write_json
 
 
-def _filter_fy(df: pd.DataFrame, month_col: str, fy: Optional[str]) -> pd.DataFrame:
+def _filter_fy(df: pd.DataFrame, month_col: str, fy: Optional[str], fy_col: Optional[str] = None) -> pd.DataFrame:
     if not fy:
         return df
-    year = int(fy.replace("FY", "")) + 2000
-    return df[df[month_col].dt.year == year]
+    if fy_col and fy_col in df.columns:
+        return df[df[fy_col].astype(str) == fy]
+    tmp = df.copy()
+    tmp[month_col] = pd.to_datetime(tmp[month_col], errors="coerce")
+    return tmp[fiscal_year_label(tmp[month_col]) == fy]
 
 
 def build_dataset(input_path: str, output_dir: str = "data/processed", fy: Optional[str] = None) -> None:
@@ -35,8 +38,10 @@ def build_dataset(input_path: str, output_dir: str = "data/processed", fy: Optio
     quote_task = build_quote_task(sheets["quote"])
 
     if fy:
-        revenue = _filter_fy(revenue, "month_key", fy)
+        revenue = _filter_fy(revenue, "month_key", fy, fy_col="FY") if "FY" in sheets["revenue"].columns else _filter_fy(revenue, "month_key", fy)
         timesheet = _filter_fy(timesheet, "month_key", fy)
+        if "quote_month_key" in quote_task.columns:
+            quote_task = _filter_fy(quote_task, "quote_month_key", fy)
 
     write_parquet(revenue, os.path.join(output_dir, "revenue_monthly.parquet"))
     write_parquet(timesheet, os.path.join(output_dir, "timesheet_task_month.parquet"))

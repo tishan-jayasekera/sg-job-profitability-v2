@@ -18,6 +18,9 @@ def build_revenue_monthly(df: pd.DataFrame) -> pd.DataFrame:
     data = data[~data["excluded_flag"]]
     revenue_monthly = (
         data.groupby(["job_no", "month_key"], as_index=False)
-        .agg(revenue_monthly=("amount", "sum"))
+        .agg(
+            revenue_monthly=("amount", "sum"),
+            FY=("FY", "first"),
+        )
     )
     return revenue_monthly

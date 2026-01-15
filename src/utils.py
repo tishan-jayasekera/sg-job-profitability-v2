@@ -110,3 +110,9 @@ def parse_period_label(start: pd.Timestamp, end: pd.Timestamp) -> str:
 
 def current_timestamp() -> str:
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def fiscal_year_label(dates: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(dates, errors="coerce")
+    fy_year = dt.dt.year + (dt.dt.month >= 7).astype(int)
+    return "FY" + fy_year.astype("Int64").astype(str).str[-2:]
