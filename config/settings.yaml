@@ -1,0 +1,24 @@
+app:
+  default_fy: FY26
+  month_key_format: "%Y-%m-%d"
+filters:
+  include_unallocated_default: true
+  show_only_dept_mismatch_default: false
+  billable_only_default: false
+  onshore_only_default: false
+thresholds:
+  unquoted_hours_share: 0.10
+  quote_attainment_overrun: 1.10
+  nonbillable_share: 0.20
+  dept_mismatch_share: 0.15
+  unallocated_revenue: 2000
+baseline:
+  rate_method: dept_median
+smart_quote:
+  coverage_target: 0.80
+  min_task_frequency_jobs: 3
+  volatility_cv_high: 0.5
+  risk_weights:
+    overrun_rate: 0.4
+    volatility: 0.4
+    unquoted_rate: 0.2
