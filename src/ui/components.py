@@ -17,9 +17,9 @@ def variance_bar_chart(df):
 
 def financial_trend_chart(df):
     """Line chart for Revenue vs Cost."""
-    base = alt.Chart(df).encode(x='month_key:T')
-    
-    rev = base.mark_line(color='#4c78a8').encode(y='revenue_allocated', tooltip=['month_key', 'revenue_allocated'])
-    cost = base.mark_line(color='#e45756').encode(y='total_cost', tooltip=['month_key', 'total_cost'])
-    
+    base = alt.Chart(df).encode(x="month_key:T")
+
+    rev = base.mark_line(color="#4c78a8").encode(y="revenue_allocated", tooltip=["month_key", "revenue_allocated"])
+    cost = base.mark_line(color="#e45756").encode(y="actual_cost", tooltip=["month_key", "actual_cost"])
+
     return (rev + cost).properties(height=300)

@@ -9,7 +9,7 @@ class FinancialEngine:
 
     def get_kpis(self):
         revenue = self.df["revenue_allocated"].sum() if "revenue_allocated" in self.df.columns else 0.0
-        cost = self.df["total_cost"].sum() if "total_cost" in self.df.columns else 0.0
+        cost = self.df["actual_cost"].sum() if "actual_cost" in self.df.columns else 0.0
         margin_pct = ((revenue - cost) / revenue * 100) if revenue else 0.0
 
         unallocated = 0.0
@@ -25,12 +25,12 @@ class FinancialEngine:
 
     def get_monthly_trend(self):
         if "month_key" not in self.df.columns:
-            return pd.DataFrame(columns=["month_key", "revenue_allocated", "total_cost"])
+            return pd.DataFrame(columns=["month_key", "revenue_allocated", "actual_cost"])
 
         trend = (
             self.df.groupby("month_key", as_index=False)
             .agg(revenue_allocated=("revenue_allocated", "sum"),
-                 total_cost=("total_cost", "sum"))
+                 actual_cost=("actual_cost", "sum"))
             .sort_values("month_key")
         )
         return trend
