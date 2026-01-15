@@ -213,10 +213,128 @@ def run_pipeline(excel_path: str = RAW_DATA_PATH, output_dir: str = OUTPUT_DIR):
     )
 
     fact["month_key"] = pd.to_datetime(fact["month_key"], errors="coerce")
+    fact["quote_month_key"] = pd.to_datetime(fact["quote_month_key"], errors="coerce")
+
+    numeric_cols = [
+        "actual_hours",
+        "actual_cost",
+        "billable_value",
+        "revenue_monthly",
+        "total_hours_job_month",
+        "task_share",
+        "revenue_allocated",
+        "quoted_time",
+        "quoted_amount",
+        "department_actual_share",
+    ]
+    for col in numeric_cols:
+        if col in fact.columns:
+            fact[col] = pd.to_numeric(fact[col], errors="coerce").fillna(0.0)
+
+    fact["rev_alloc"] = fact["revenue_allocated"]
+    fact["gp"] = fact["rev_alloc"] - fact["actual_cost"]
+    fact["margin"] = np.where(fact["rev_alloc"] > 0, fact["gp"] / fact["rev_alloc"], 0.0)
+    fact["rev_per_hour"] = np.where(fact["actual_hours"] > 0, fact["rev_alloc"] / fact["actual_hours"], 0.0)
+    fact["cost_per_hour"] = np.where(fact["actual_hours"] > 0, fact["actual_cost"] / fact["actual_hours"], 0.0)
+
+    fact["unquoted_task"] = (fact["quoted_time"] == 0) & (fact["actual_hours"] > 0)
+    fact["quote_only_task"] = fact["is_quote_only"].fillna(False)
+    fact["unallocated_revenue"] = fact["is_unallocated"].fillna(False)
+    fact["dept_mismatch"] = (
+        fact["Department_actual"].fillna("") != ""
+    ) & (
+        fact["Department_quote"].fillna("") != ""
+    ) & (
+        fact["Department_actual"].fillna("") != fact["Department_quote"].fillna("")
+    )
+    fact["mixed_department"] = fact["department_actual_share"].fillna(0.0) < 0.7
+
+    fact["overrun_hours"] = (fact["actual_hours"] - fact["quoted_time"]).clip(lower=0)
+    fact["overrun_cost"] = fact["overrun_hours"] * fact["cost_per_hour"]
+    fact["quote_attainment"] = np.where(fact["quoted_time"] > 0, fact["actual_hours"] / fact["quoted_time"], 0.0)
+
+    fact["unquoted_hours"] = np.where(fact["unquoted_task"], fact["actual_hours"], 0.0)
+    fact["dept_mismatch_hours"] = np.where(fact["dept_mismatch"], fact["actual_hours"], 0.0)
+    fact["unallocated_revenue_amt"] = np.where(fact["unallocated_revenue"], fact["rev_alloc"], 0.0)
+
+    job_month = (
+        fact.groupby(["job_no", "month_key"], as_index=False)
+        .agg(
+            revenue_monthly=("revenue_monthly", "sum"),
+            rev_alloc=("rev_alloc", "sum"),
+            actual_cost=("actual_cost", "sum"),
+            actual_hours=("actual_hours", "sum"),
+            billable_value=("billable_value", "sum"),
+            unallocated_revenue_amt=("unallocated_revenue_amt", "sum"),
+            unquoted_hours=("unquoted_hours", "sum"),
+            dept_mismatch_hours=("dept_mismatch_hours", "sum"),
+        )
+    )
+    job_month["gp"] = job_month["rev_alloc"] - job_month["actual_cost"]
+    job_month["margin"] = np.where(job_month["rev_alloc"] > 0, job_month["gp"] / job_month["rev_alloc"], 0.0)
+    job_month["rev_per_hour"] = np.where(job_month["actual_hours"] > 0, job_month["rev_alloc"] / job_month["actual_hours"], 0.0)
+    job_month["cost_per_hour"] = np.where(job_month["actual_hours"] > 0, job_month["actual_cost"] / job_month["actual_hours"], 0.0)
+    job_month["unquoted_share"] = np.where(job_month["actual_hours"] > 0, job_month["unquoted_hours"] / job_month["actual_hours"], 0.0)
+    job_month["dept_mismatch_share"] = np.where(job_month["actual_hours"] > 0, job_month["dept_mismatch_hours"] / job_month["actual_hours"], 0.0)
+
+    job_task_quotes = (
+        fact.groupby(["job_no", "task_name"], as_index=False)
+        .agg(
+            quoted_time=("quoted_time", "max"),
+            quoted_amount=("quoted_amount", "max"),
+        )
+    )
+    job_quote_totals = job_task_quotes.groupby("job_no", as_index=False).agg(
+        quoted_time_total=("quoted_time", "sum"),
+        quoted_amount_total=("quoted_amount", "sum"),
+    )
+    job_rollup = (
+        fact.groupby("job_no", as_index=False)
+        .agg(
+            rev_alloc=("rev_alloc", "sum"),
+            actual_cost=("actual_cost", "sum"),
+            actual_hours=("actual_hours", "sum"),
+            billable_value=("billable_value", "sum"),
+            unallocated_revenue_amt=("unallocated_revenue_amt", "sum"),
+            unquoted_hours=("unquoted_hours", "sum"),
+            dept_mismatch_hours=("dept_mismatch_hours", "sum"),
+        )
+        .merge(job_quote_totals, on="job_no", how="left")
+    )
+    job_rollup["gp"] = job_rollup["rev_alloc"] - job_rollup["actual_cost"]
+    job_rollup["margin"] = np.where(job_rollup["rev_alloc"] > 0, job_rollup["gp"] / job_rollup["rev_alloc"], 0.0)
+    job_rollup["rev_per_hour"] = np.where(job_rollup["actual_hours"] > 0, job_rollup["rev_alloc"] / job_rollup["actual_hours"], 0.0)
+    job_rollup["cost_per_hour"] = np.where(job_rollup["actual_hours"] > 0, job_rollup["actual_cost"] / job_rollup["actual_hours"], 0.0)
+    job_rollup["unquoted_share"] = np.where(job_rollup["actual_hours"] > 0, job_rollup["unquoted_hours"] / job_rollup["actual_hours"], 0.0)
+    job_rollup["dept_mismatch_share"] = np.where(job_rollup["actual_hours"] > 0, job_rollup["dept_mismatch_hours"] / job_rollup["actual_hours"], 0.0)
+    job_rollup["quote_attainment_total"] = np.where(
+        job_rollup["quoted_time_total"] > 0,
+        job_rollup["actual_hours"] / job_rollup["quoted_time_total"],
+        0.0,
+    )
+
+    task_rollup = (
+        fact.groupby(["job_no", "task_name"], as_index=False)
+        .agg(
+            actual_hours=("actual_hours", "sum"),
+            actual_cost=("actual_cost", "sum"),
+            rev_alloc=("rev_alloc", "sum"),
+            quoted_time=("quoted_time", "max"),
+            quoted_amount=("quoted_amount", "max"),
+        )
+    )
+    task_rollup["cost_per_hour"] = np.where(task_rollup["actual_hours"] > 0, task_rollup["actual_cost"] / task_rollup["actual_hours"], 0.0)
+    task_rollup["gp"] = task_rollup["rev_alloc"] - task_rollup["actual_cost"]
+    task_rollup["margin"] = np.where(task_rollup["rev_alloc"] > 0, task_rollup["gp"] / task_rollup["rev_alloc"], 0.0)
+    task_rollup["overrun_hours"] = (task_rollup["actual_hours"] - task_rollup["quoted_time"]).clip(lower=0)
+    task_rollup["overrun_cost"] = task_rollup["overrun_hours"] * task_rollup["cost_per_hour"]
 
     # 8. Export
     os.makedirs(output_dir, exist_ok=True)
     fact.to_csv(os.path.join(output_dir, "fact_job_task_month.csv"), index=False)
+    job_month.to_csv(os.path.join(output_dir, "job_month_rollup.csv"), index=False)
+    job_rollup.to_csv(os.path.join(output_dir, "job_rollup.csv"), index=False)
+    task_rollup.to_csv(os.path.join(output_dir, "job_task_rollup.csv"), index=False)
     print(f"ETL Complete. Canonical fact table saved to {output_dir}")
 
 
