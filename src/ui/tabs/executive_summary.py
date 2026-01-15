@@ -15,7 +15,7 @@ def render(financial_engine, variance_engine):
     
     st.subheader("Financial Trend")
     trend_df = financial_engine.get_monthly_trend()
-    st.altair_chart(financial_trend_chart(trend_df), use_container_width=True)
+    st.altair_chart(financial_trend_chart(trend_df), width="stretch")
     
     st.subheader("Bottom 10 Jobs (Margin %)")
     problems = variance_engine.get_problem_jobs()

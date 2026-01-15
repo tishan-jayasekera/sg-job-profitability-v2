@@ -19,8 +19,8 @@ def render(builder_engine, product_list):
                     "avg_hours": "{:.1f}",
                     "median_hours": "{:.1f}",
                     "risk_factor": "{:.2f}x"
-                }).background_gradient(subset=['risk_factor'], cmap='RdYlGn_r', vmin=0.8, vmax=1.5),
-                use_container_width=True
+                }),
+                width="stretch"
             )
             
             st.markdown("""

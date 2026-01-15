@@ -21,7 +21,7 @@ def render(variance_engine, job_list):
         
         st.subheader("Scope Variance (The Triangle)")
         st.caption("Right (Red) = Overrun | Left (Green) = Efficiency")
-        st.altair_chart(variance_bar_chart(job_data), use_container_width=True)
+        st.altair_chart(variance_bar_chart(job_data), width="stretch")
         
         st.subheader("Task Details")
         st.dataframe(job_data)
